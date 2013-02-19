@@ -1,4 +1,5 @@
 -- Copyright (C) 2013 Azure Wang(azure1st@gmail.com)
+
 local string = string
 local table  = table
 local bit    = bit
