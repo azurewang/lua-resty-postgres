@@ -32,7 +32,7 @@ end
 <a name="author" class="anchor" href="#author"><span class="mini-icon mini-icon-link"></span></a>
 Author
 </h1>
-<p>Azure Wang (王非)<a href="mailto:azure1st@gmail.com">azure1st@gmail.com</a></p>
+<p>Azure Wang (鐜嬮潪)<a href="mailto:azure1st@gmail.com">azure1st@gmail.com</a></p>
 
 <h1>
 <a name="copyright-and-license" class="anchor" href="#copyright-and-license"><span class="mini-icon mini-icon-link"></span></a>
@@ -40,7 +40,7 @@ Copyright and License
 </h1>
 <p>This module is licensed under the BSD license.</p>
 
-<p>Copyright (C) 2013, by Azure Wang (王非) <a href="mailto:azure1st@gmail.com">azure1st@gmail.com</a>.</p>
+<p>Copyright (C) 2013, by Azure Wang (鐜嬮潪) <a href="mailto:azure1st@gmail.com">azure1st@gmail.com</a>.</p>
 
 <p>All rights reserved.</p>
 
