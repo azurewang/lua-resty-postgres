@@ -351,6 +351,11 @@ function query(self, query)
     return read_result(self)
 end
 
+function escape_string(str)
+    local new = string.gsub(str, "['\\]", "%0%0")
+    return new
+end
+
 local class_mt = {
     -- to prevent use of casual module global variables
     __newindex = function (table, key, val)
