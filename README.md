@@ -9,7 +9,8 @@ local pg = require("resty.postgres")
 local db = pg:new()
 db:set_timeout(3000)
 
-local ok, err = db:connect({host="127.0.0.1",port=5432, database="postgres",user="admin",password="123456",compact=false})
+local ok, err = db:connect({host="127.0.0.1",port=5432, database="postgres",
+                            user="admin",password="123456",compact=false})
 
 if not ok then
     ngx.say(err)
