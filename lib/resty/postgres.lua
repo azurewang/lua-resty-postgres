@@ -329,17 +329,38 @@ function read_result(self)
             end 
             table.insert(res, row)
         end
+        if typ == 'E' then
+            -- error packet
+            local pos = 1
+            local flg, value
+            while true do
+                flg = string.sub(packet, pos, pos)
+                pos = pos + 1
+                if flg == '\0' then
+                   break
+                end
+                -- all flg S/C/M/P/F/L/R
+                value, pos = _from_cstring(packet, pos)
+                if flg == 'M' then
+                    -- message
+                    err = value
+                end
+            end
+            res = nil
+            break
+        end
         if typ == 'C' then
             -- read complete
             local sql_type = _from_cstring(packet, 1)
             self.env.sql_type = sql_type
+            err = nil
         end
         if typ == 'Z' then
             self.state = STATE_CONNECTED
             break
         end
     end   
-    return res
+    return res, err
 end
 
 function query(self, query)
