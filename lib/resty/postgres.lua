@@ -111,12 +111,18 @@ function _parse_error_packet(packet)
     msg = {}
     while true do
        flg = string.sub(packet, pos, pos)
+       if not flg then
+           return nil, "parse error packet fail"
+       end
        pos = pos + 1
        if flg == '\0' then
           break
        end
        -- all flg S/C/M/P/F/L/R
        value, pos = _from_cstring(packet, pos)
+       if not value then
+           return nil, "parse error packet fail"
+       end
        msg[flg] = value
    end
    return msg
@@ -243,6 +249,9 @@ function connect(self, opts)
     end
     while true do
         packet, typ, err = _recv_packet(self)
+        if not packet then
+            return nil, "read packet error:" .. err
+        end
         -- env
         if typ == 'S' then
             local pos = 1
