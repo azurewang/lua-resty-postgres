@@ -18,6 +18,22 @@ local AUTH_REQ_OK = "\00\00\00\00"
 
 local mt = { __index = _M }
 
+local converters = {}
+-- INT8OID
+converters[20] = tonumber
+-- INT2OID
+converters[21] = tonumber
+-- INT2VECTOROID
+converters[22] = tonumber
+-- INT4OID
+converters[23] = tonumber
+-- FLOAT4OID
+converters[700] = tonumber
+-- FLOAT8OID
+converters[701] = tonumber
+-- NUMERICOID
+converters[1700] = tonumber
+
 function new(self)
     local sock, err = ngx.socket.tcp()
     if not sock then
@@ -71,23 +87,6 @@ local function _to_cstring(data)
     return {data, "\0"}
 end
 
-local function dataconvert(type, data)
-    -- do not touch null values
-    if data == ngx.null then
-        return data
-    end
-    if type == 20 then -- int
-        data = tonumber(data)
-    elseif type == 23 then -- int
-        data = tonumber(data)
-    elseif type == 700 then -- real
-        data = tonumber(data)
-    elseif type == 701 then -- real
-        data = tonumber(data)
-    end
-    return data
-end
-
 function _send_packet(self, data, len, typ)
     local sock = self.sock
     local packet
@@ -104,6 +103,29 @@ function _send_packet(self, data, len, typ)
         }
     end
     return sock:send(packet)
+end
+
+function _parse_error_packet(packet)
+    local pos = 1
+    local flg, value, msg
+    msg = {}
+    while true do
+       flg = string.sub(packet, pos, pos)
+       if not flg then
+           return nil, "parse error packet fail"
+       end
+       pos = pos + 1
+       if flg == '\0' then
+          break
+       end
+       -- all flg S/C/M/P/F/L/R
+       value, pos = _from_cstring(packet, pos)
+       if not value then
+           return nil, "parse error packet fail"
+       end
+       msg[flg] = value
+   end
+   return msg
 end
 
 function _recv_packet(self)
@@ -202,12 +224,11 @@ function connect(self, opts)
     -- receive salt packet (len + data) no type
     local packet, typ
     packet, typ, err = _recv_packet(self)
-    if typ == 'E' then
-        local pos = 2
-        local k, pos = _from_cstring(packet, pos)
-        local v, pos = _from_cstring(packet, pos)
-        local msg, pos  = _from_cstring(packet, pos+1)
-        return nil, 'Got error:'..k..', code:'..v..", msg:"..msg.." in auth state"
+    if not packet then
+        return nil, "handshake error:" .. err
+    end
+    if typ ~= 'R' then
+        return nil, "handshake error, got packet type:" .. typ
     end
     local auth_type = string.sub(packet, 1, 4)
     local salt = string.sub(packet, 5, 8)
@@ -228,6 +249,9 @@ function connect(self, opts)
     end
     while true do
         packet, typ, err = _recv_packet(self)
+        if not packet then
+            return nil, "read packet error:" .. err
+        end
         -- env
         if typ == 'S' then
             local pos = 1
@@ -241,6 +265,11 @@ function connect(self, opts)
             local secret_key = string.sub(packet, 5, 8)
             self.env.secret_key = secret_key
             self.env.pid = pid
+        end
+        -- error
+        if typ == 'E' then
+            local msg = _parse_error_packet(packet)
+            return nil, "Get error packet:" .. msg.M
         end
         -- ready for new query
         if typ == 'Z' then
@@ -341,21 +370,22 @@ function read_result(self)
             local row_num, pos = _get_byte2(packet, 1)
             -- get row
             for i=1, row_num do
-                local data, len, newpos
-                len, newpos = _get_byte4(packet, pos)
-                -- check for NULL
-                if len == -1 then 
-                    data, pos = ngx.null, pos + 4
+                local data, len
+                len, pos = _get_byte4(packet, pos)
+                if len == -1 then
+                    data = ngx.null
                 else
-                    data, pos = _get_data_n(packet, len, newpos)
+                    data, pos = _get_data_n(packet, len, pos)
                 end
-                -- Convert data to correct type
-                data = dataconvert(fields[i].type_id, data)
-
+                local field = fields[i]
+                local conv = converters[field.type_id]
+                if conv and data ~= ngx.null then
+                    data = conv(data)
+                end
                 if self.compact then
                     table.insert(row, data)
                 else
-                    local name = fields[i].name
+                    local name = field.name
                     row[name] = data
                 end
             end 
@@ -363,21 +393,8 @@ function read_result(self)
         end
         if typ == 'E' then
             -- error packet
-            local pos = 1
-            local flg, value
-            while true do
-                flg = string.sub(packet, pos, pos)
-                pos = pos + 1
-                if flg == '\0' then
-                   break
-                end
-                -- all flg S/C/M/P/F/L/R
-                value, pos = _from_cstring(packet, pos)
-                if flg == 'M' then
-                    -- message
-                    err = value
-                end
-            end
+            local msg = _parse_error_packet(packet)
+            err = msg.M
             res = nil
             break
         end
