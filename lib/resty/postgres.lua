@@ -230,23 +230,31 @@ function connect(self, opts)
     if typ ~= 'R' then
         return nil, "handshake error, got packet type:" .. typ
     end
-    local auth_type = string.sub(packet, 1, 4)
-    local salt = string.sub(packet, 5, 8)
-    -- send passsowrd
-    req = {_to_cstring(_compute_token(self, user, password, salt))}
-    req_len = 40
-    local bytes, err = _send_packet(self, req, req_len, 'p')
-    if not bytes then
-        return nil, "failed to send client authentication packet2: " .. err
+    local auth_type = _get_byte4(packet, 1)
+
+    if auth_type == 5 then
+        -- Authentication type 5 is MD5 password encryption
+        local salt = string.sub(packet, 5, 8)
+        -- send password
+        req = {_to_cstring(_compute_token(self, user, password, salt))}
+        req_len = 40
+        local bytes, err = _send_packet(self, req, req_len, 'p')
+        if not bytes then
+            return nil, "failed to send client authentication packet2: " .. err
+        end
+        -- receive response
+        packet, typ, err = _recv_packet(self)
+        if typ ~= 'R' then
+            return nil, "authentication response packet type was '"..typ.."'; expected 'R'"
+        end
+        if packet ~= AUTH_REQ_OK then
+            return nil, "authentication failed"
+        end
+    elseif auth_type ~= 0 then
+        -- 0 means authentication was already successful (with no password required)
+        return nil, "authentication failed: server wants to use type "..auth_type..", but we only support MD5 password encryption (type 5)"
     end
-    -- receive response
-    packet, typ, err = _recv_packet(self)
-    if typ ~= 'R' then
-        return nil, "auth return type not support"
-    end
-    if packet ~= AUTH_REQ_OK then
-        return nil, "authentication failed"
-    end
+
     while true do
         packet, typ, err = _recv_packet(self)
         if not packet then
